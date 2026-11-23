@@ -1,4 +1,5 @@
 import smtplib
+import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -8,8 +9,6 @@ def send_shortlist_email(receiver_email, candidate_name, sender_email, sender_pa
         return False
 
     smtp_server = "smtp.gmail.com"
-    port = 587
-
     clean_name = candidate_name.strip() if candidate_name and candidate_name.strip() else "Candidate"
 
     message = MIMEMultipart("alternative")
@@ -20,8 +19,8 @@ def send_shortlist_email(receiver_email, candidate_name, sender_email, sender_pa
     text = (
         f"Dear {clean_name},\n\n"
         "Congratulations! You have been selected to move forward in the hiring process "
-        "Our team will contact you again regarding your interview schedule.\n\n"
         "at Rhombix Technologies.\n\n"
+        "Our team will contact you again regarding your interview schedule.\n\n"
         "Best regards,\n"
         "HR Team\n"
         "Rhombix Technologies"
@@ -46,12 +45,22 @@ def send_shortlist_email(receiver_email, candidate_name, sender_email, sender_pa
     message.attach(MIMEText(html, "html"))
 
     try:
-        server = smtplib.SMTP(smtp_server, port, timeout=15)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, receiver_email, message.as_string())
-        server.quit()
+        with smtplib.SMTP(smtp_server, 587, timeout=30) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, receiver_email, message.as_string())
         return True
-    except Exception as e:
-        print(f"Error sending email to {receiver_email}: {e}")
+    except Exception as e_587:
+        print(f"Port 587 failed for {receiver_email}: {e_587}")
+
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL(smtp_server, 465, context=context, timeout=30) as server:
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, receiver_email, message.as_string())
+        return True
+    except Exception as e_465:
+        print(f"Error sending email to {receiver_email}: {e_465}")
         return False
